@@ -1,0 +1,21 @@
+怎么把当前修改为多目标的dqn？
+0.涉及的函数
+Env.step():传入env，action，返回self.State, cost, done, comm, var
+Env.cost()
+Env.
+
+1.思路
+原先：单一Q函数，两部分需要优化的指标为线性组合成总cost，两个指标在代码中为comm, var
+想法：将单一Q函数拆解为多Q函数，获得多Q值，分别训练后再线性组合选择最优解
+    将原先的单一cost产生reward解为多cost1，cost2...costn
+    根据新的costi设置新的rewardi，并加入rpm中
+
+2.操作
+设定奖励值reward的位置为train.run_train_episode()
+设置cost构成的位置为Env.step()和Env.cost()
+
+
+
+
+如果只按照每个cost设定不同的reward，再分别训练网络，会导致局部最优解！！！
+应该怎么处理？reward sharing？
