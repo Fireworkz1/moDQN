@@ -70,6 +70,18 @@ def test3():
     print(sorted_indices)
     # sorted_indices 现在是 [1, 2, 0, 3]
 
+def test4():
+    return 0.1,0.2,0.3
+
+def test5():
+    a=1
+    b=2
+    c=-1
+    if a>0 and b>0:
+        print(1)
+    elif a>0 and c>0:
+        print(2)
+
 
 if __name__ == '__main__':
-    test3()
+    test5()

@@ -32,12 +32,20 @@ class Model(parl.Model):
         hid1_size = 128
         hid2_size = 128
         # 3层全连接层
+        # 三头网络
         self.fc1 = nn.Linear(obs_dim, hid1_size)
         self.fc2 = nn.Linear(hid1_size, hid2_size)
-        self.fc3 = nn.Linear(hid2_size, act_dim)
+        #self.fc3 = nn.Linear(hid2_size, act_dim)
+        self.head1 = nn.Linear(hid2_size, act_dim)
+        self.head2 = nn.Linear(hid2_size, act_dim)
+        self.head3 = nn.Linear(hid2_size, act_dim)
 
     def forward(self, obs):
         h1 = F.relu(self.fc1(obs))
         h2 = F.relu(self.fc2(h1))
-        Q = self.fc3(h2)
-        return Q
+        #Q = self.fc3(h2)
+        #return Q
+        Q1 = self.head1(h2)
+        Q2 = self.head2(h2)
+        Q3 = self.head3(h2)
+        return Q1, Q2, Q3

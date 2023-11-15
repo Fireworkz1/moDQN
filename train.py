@@ -16,18 +16,23 @@
 
 import logging
 
-# 检查版本
-import numpy as np
-
 from agent import Agent
 from agent import flag
 from agent import flag_temp
 from algorithm import DQN  # from parl.algorithms import DQN  # parl >= 1.3.1
+# 添加部分全局变量
 from env import ContainerNumber
 from env import Env
 from env import NodeNumber
+from env import ResourceType
+from env import e_greed
+from env import e_greed_decrement
 from model import Model
 from replay_memory import ReplayMemory
+from reward import Culreward
+from weight import getWeightReward
+
+# 检查版本
 
 LEARN_FREQ = 6  # learning frequency
 MEMORY_SIZE = 10000  # size of replay memory
@@ -40,9 +45,14 @@ sc_comm = 0
 sc_var = 0
 flag1 = 1
 ep = 0
-allCost = [[], [], [], [], [], []]
-test_reward = 0
+# allCost = [[], [], [], [], [], []]
+allReward = [[], [], [], [], [], []]
+
 test_evareward = 0
+# ------------
+min_feature1 = 100000000000
+min_feature2 = 100000000000
+min_feature3 = 100000000000
 
 
 # LEARN_FREQ = 5  # 训练频率，不需要每一个step都learn，攒一些新增经验后再learn，提高效率
@@ -80,179 +90,139 @@ test_evareward = 0
 
 def run_train_episode(agent, env, rpm):
     global flag1
-    global allCost  # allCost = [[], [], [], [], [], []]
+    # allCost =     [[], [], [], [], [], []]
+    global allReward  # allReward = [[], [], [], [], [], []]
     global ep
-    global test_reward
+
+    # ------------
+    global min_feature1
+    global min_feature2
+    global min_feature3
 
     obs_list = []
     next_obslist = []
     action_list = []
     done_list = []
 
-    total_reward = 0
-    total_cost = 0
+    total_reward1 = 0
+    total_reward2 = 0
+    total_reward3 = 0
     ep += 1
     obs, action = env.reset()
 
     step = 0
     # minc ost
-    mini = -1
-    co = 0
+    minReward = -1
+
     for o in range(ContainerNumber * NodeNumber):
         flag_temp[o] = 0
         flag[o] = 0
     flag1 -= 1
+    # ------------
+    feature1_temp = 0
+    feature2_temp = 0
+    feature3_temp = 0
 
     while True:
-        reward = 0
+
         step += 1
 
         # 选择一种动作（随机或最优）
-        #act[0]为节点号
-        #act[1]为容器编号
+        # act[0]为节点号
+        # act[1]为容器编号
         action = agent.sample(obs)
         # 与环境交互
-        #container_state_queue中的-1变为该容器部署的节点号（nextobs中）
-        #node_state_value中每8号代表一个节点，前六位为容器是否部署在该node（部署为1），后两位为节点的资源占用情况
-        next_obs, cost, done, _, _ = env.step(action)
+        # container_state_queue中的-1变为该容器部署的节点号（nextobs中）
+        # node_state_value中每8号代表一个节点，前六位为容器是否部署在该node（部署为1），后两位为节点的资源占用情况
+        next_obs, feature1, feature2, feature3, done = env.step(action)
+
         # 记录当前episode的数据
         obs_list.append(obs)
         action_list.append(action)
         next_obslist.append(next_obs)
         done_list.append(done)
 
-        # 评估这一个episode，给予奖励或惩罚·
-        if allCost[step - 1]:
-            # allCost = [[], [], [], [], [], []]
-            # 如果内层list中有值，则mini取其中最小值，否则为-1
-            # 每个列表代表一个step
-            mini = min(allCost[step - 1])
+        # ------------
+        feature1_temp = feature1  # feature1（cost&var）为即时型
+        feature2_temp += feature2  # feature2（通信延迟）为累加型
+        feature3_temp = feature3```
         if flag1 == 0:
-            # if it's the first episode, save the cost directly
-            if cost > 0:
-                allCost[step - 1].append(cost)
-                reward = 0
-                co += 1
-            else:
-                flag1 += 1
-                for i in range(co):
-                    allCost[step - 1 - (i + 1)].clear()
-                break
-        else:
-            if cost > 0:
-                # 循环六次（一个episode）后
-                if step == 6:
-                    # 如果总cost和以前差不多
-                    if abs(min(allCost[step - 1]) - cost) < 0.0001:
-                        reward = test_reward
-                    # 如果总cost比以前更少了，给奖励
-                    elif (min(allCost[step - 1]) - cost) > 0:
-                        test_reward = test_reward + 100
-                        reward = test_reward
-                    # 给惩罚
-                    else:
-                        reward = 10 * (min(allCost[step - 1]) - cost)
-                    for i in range(6):
-                        rpm.append((obs_list[i], action_list[i], reward, next_obslist[i], done_list[i]))
-                    allCost[step - 1].append(cost)
-            # 如果cost为负？应该不可能？
-            else:
-                reward = -100
-                rpm.append((obs, action, reward, next_obs, done))
+            if step == 6:
+                # 如果是第一个episode，直接存入
+                # 如果feature不好，则舍弃这一个episode，下一个episode看作第一个episode
+                if feature1_temp > 0 and feature2_temp > 0 and feature3_temp > 0:
+                    min_feature1 = feature1_temp
+                    min_feature2 += feature2_temp
+                    min_feature3 += feature3```
+                    reward1 = 0
+                    reward2 = 0
+                    reward3 = 0
 
+                else:
+                    flag1 += 1
+                    min_feature1 = 100000000000
+                    min_feature2 = 100000000000
+                    min_feature3 = 100000000000
+                    break
+
+        # 如果不是第一个episode，进入reward环节
+        else:
+            if step == 6:
+                # feature1：35左右
+                # feature2：35左右
+                # feature3：
+                feature2 = feature2_temp
+                ```
+                reward1, reward2, reward3, min_feature1, min_feature2, min_feature3 = Culreward(feature1, feature2,
+                                                                                                feature3, min_feature1,
+                                                                                                min_feature2,
+                                                                                                min_feature3)
+
+                for i in range(6):
+                    rpm.append(
+                        (obs_list[i], action_list[i], reward1, reward2, reward3, next_obslist[i], done_list[i]))
+        w = getWeightReward()
+        rewardAvg = reward1 * w[0] + reward2 * w[1] + reward3 * w[2]
+        rewardAvg /= sum(w)
         # 输出到日志
         root_logger = logging.getLogger()
         for h in root_logger.handlers[:]:
             root_logger.removeHandler(h)
         logging.basicConfig(level=logging.INFO, filename='details.log')
-        logging.info('episode:{}  step:{} Cost:{} min Cost:{} Reward:{} global reward:{} Action:{}'.format(
-            ep, step, cost, mini, reward, test_reward, env.index_to_act(action)))
+        logging.info(
+            'episode:{} step:{} Reward1:{} Reward2:{} Reward3:{} Reward:{} Action:{}'.format(
+                ep, step, reward1, reward2, reward3, rewardAvg, env.index_to_act(action)))
 
         # 如果rpm池已满，开始训练
         if (len(rpm) > MEMORY_WARMUP_SIZE) and (step % LEARN_FREQ == 0):
-            (batch_obs, batch_action, batch_reward, batch_next_obs,
+            (batch_obs, batch_action, batch_reward1, batch_reward2, batch_reward3, batch_next_obs,
              batch_done) = rpm.sample(BATCH_SIZE)
 
-            train_loss = agent.learn(batch_obs, batch_action, batch_reward,
-                                     batch_next_obs,
-                                     batch_done)  # s,a,r,s',done
+            train_loss, loss1, loss2, loss3 = agent.learn(batch_obs, batch_action, batch_reward1, batch_reward2,
+                                                          batch_reward3,
+                                                          batch_next_obs,
+                                                          batch_done)  # s,a,r,s',done
             with open("trainloss.txt", "a") as f:
-                f.write("%d,%.3f \n" % (ep, train_loss))
-        total_reward += reward
-        total_cost += cost
+                f.write("ep:%d,loss:%.3f,loss1:%.3f,loss2:%.3f,loss3:%.3f \n" % (ep, train_loss, loss1, loss2, loss3))
         obs = next_obs
         if done:
             break
-    return total_reward, total_cost
-
-
-# 评估 agent, 跑 5 个episode，总reward求平均
-# def run_evaluate_episodes(agent, env, render=False):
-#     eval_reward = []
-#     for i in range(5):
-#         obs = env.reset()
-#         episode_reward = 0
-#         while True:
-#             action = agent.predict(obs)  # 预测动作，只选最优动作
-#             obs, reward, done, _ = env.step(action)
-#             episode_reward += reward
-#             if render:
-#                 env.render()
-#             if done:
-#                 break
-#         eval_reward.append(episode_reward)
-#     return np.mean(eval_reward)
-
-def evaluate(env, agent):
-    global sc_comm, sc_var
-    eval_totalCost = []
-    eval_totalReward = []
-    reward = 0
-    test_evareward = 0
-    for i in range(1):
-        env.prepare()
-        obs = env.update()
-        for o in range(ContainerNumber * NodeNumber):
-            flag_temp[o] = 0
-            flag[o] = 0
-
-        episode_cost = 0
-        episode_reward = 0
-        step = 0
-        while True:
-            step += 1
-            action = agent.predict(obs)
-            obs, cost, done, comm, var = env.step(action)
-            if cost > 0:
-                if step == 6:
-                    if abs(min(allCost[step - 1]) - cost) < 0.0001:
-                        reward = test_evareward
-                    elif min(allCost[step - 1]) - cost > 0:
-                        test_evareward += 100
-                        reward = test_evareward
-                    else:
-                        reward = 10 * (min(allCost[step - 1]) - cost)
-            else:
-                reward = -100
-            episode_cost = cost
-            episode_reward = reward
-            sc_comm = comm
-            sc_var = var
-            if done:
-                break
-        eval_totalCost.append(episode_cost)
-        eval_totalReward.append(episode_reward)
-    return eval_totalCost, eval_totalReward, sc_comm, sc_var
+    w = getWeightReward()
+    featureAvg = feature1 * w[0] + feature2 * w[1] + feature3 * w[2]
+    featureAvg /= sum(w)
+    rewardAvg = reward1 * w[0] + reward2 * w[1] + reward3 * w[2]
+    rewardAvg /= sum(w)
+    return feature1, feature2, feature3, featureAvg, reward1, reward2, reward3, rewardAvg
 
 
 def main():
     global sc_comm, sc_var
     env = Env()
-    obs_shape = ContainerNumber * 3 + NodeNumber * (
-                ContainerNumber + 2)  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
+    obs_shape = ContainerNumber * (ResourceType + 1) + NodeNumber * (
+            ContainerNumber + 2)  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
     action_dim = ContainerNumber * NodeNumber
 
-    rpm = ReplayMemory(MEMORY_SIZE)  # DQN的经验回放池
+    rpm = ReplayMemory(MEMORY_SIZE)  # Target1的经验回放池
 
     # 根据parl框架构建agent
     model = Model(obs_dim=obs_shape, act_dim=action_dim)
@@ -260,8 +230,8 @@ def main():
     agent = Agent(
         algorithm,
         act_dim=action_dim,
-        e_greed=0.2,  # 有一定概率随机选取动作，探索
-        e_greed_decrement=1e-6)  # type: ignore # 随着训练逐步收敛，探索的程度慢慢降低
+        e_greed=e_greed,  # 有一定概率随机选取动作，探索
+        e_greed_decrement=e_greed_decrement)  # type: ignore # 随着训练逐步收敛，探索的程度慢慢降低
 
     # 加载模型
     # save_path = './dqn_model.ckpt'
@@ -275,35 +245,48 @@ def main():
     max_episode = 2000
 
     # start train
-    episode = 0
-    while episode < max_episode:  # 训练max_episode个回合，test部分不计算入episode数量
+    round = 0
+
+    while round < max_episode:  # 训练max_episode个回合，test部分不计算入episode数量
         # train part
+        f1_list = []
+        f2_list = []
+        f3_list = []
+        favg_list = []
+        r1_list = []
+        r2_list = []
+        r3_list = []
+        ravg_list = []
         with open("cost.txt", "a") as f:
             f.write("开始训练 \n")
         for i in range(50):
-            total_reward = run_train_episode(agent, env, rpm)
-            episode += 1
+            f1, f2, f3, favg, r1, r2, r3, ravg = run_train_episode(agent, env, rpm)
+            f1_list.append(f1)
+            f2_list.append(f2)
+            f3_list.append(f3)
+            favg_list.append(favg)
+            round += 1
 
         # test part       render=True 查看显示效果
         # eval_reward = run_evaluate_episodes(agent, env, render=False)
         # logger.info('episode:{}    e_greed:{}   Test reward:{}'.format(
         #     episode, agent.e_greed, eval_reward))
 
-        eval_totalCost, eval_totalReward, sc_comm, sc_var = evaluate(env, agent)
         with open("cost.txt", "a") as f:
-            f.write("%d,%.6f \n" % (episode, np.mean(eval_totalCost)))
+            f.write("round=%d,f1=%.6f,f2=%.6f,f3=%.6f,favg=%.6f,r1=%.6f,r2=%.6f,r3=%.6f,ravg=%.6f \n" % (
+                round, sum(f1_list) / len(f1_list), sum(f2_list) / len(f2_list), sum(f3_list) / len(f3_list),
+                sum(favg_list) / len(favg_list), sum(r1_list) / len(r1_list), sum(r2_list) / len(r2_list),
+                sum(r3_list) / len(r3_list), sum(ravg_list) / len(ravg_list)))
         root_logger = logging.getLogger()
         for h in root_logger.handlers[:]:
             root_logger.removeHandler(h)
-
         logging.basicConfig(level=logging.INFO, filename='a.log')
-        logging.info('episode:{} e_greed:{} Cost: {} Reward:{} Action:{}'.format(
-            episode, agent.e_greed, np.mean(eval_totalCost), np.mean(eval_totalReward), env.action_queue))
+        logging.info('round:{} e_greed:{} CostAvg: {} RewardAvg:{} Action:{}'.format(
+            round, agent.e_greed, sum(favg_list) / len(favg_list), sum(ravg_list) / len(ravg_list), env.action_queue))
 
     # 训练结束，保存模型
-    save_path = './dqn_model.ckpt'
+    save_path = './mdqn_model.ckpt'
     agent.save(save_path)
-    return sc_comm, sc_var
 
 
 if __name__ == '__main__':

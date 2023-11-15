@@ -1,0 +1,69 @@
+怎么把当前修改为多目标的dqn？
+0.涉及的函数
+Env.step():传入env，action，返回self.State, cost, done, comm, var
+Env.cost()
+Env.
+
+1.思路
+原先：单一Q函数，两部分需要优化的指标为线性组合成总cost，两个指标在代码中为comm, var
+想法：将单一Q函数拆解为多Q函数，获得多Q值，分别训练后再线性组合选择最优解
+    将原先的单一cost产生reward解为多cost1，cost2...costn
+    根据新的costi设置新的rewardi，并加入rpm中
+
+2.操作
+设定奖励值reward的位置为train.run_train_episode()
+设置cost构成的位置为Env.step()和Env.cost()
+
+
+
+
+如果只按照每个cost设定不同的reward，再分别训练网络，会导致局部最优解！！！
+应该怎么处理？reward sharing？
+
+
+
+已经修改到：agent.alg.predict()
+
+
+改写rpm类，使其为元组形式，对应多个目标值（或者使用多个单rpm？）
+*网络模型位于model.py
+*算法学习方式位于algorithm.py
+
+从里到外修改
+1.修改model网络，将其变为可返回三个Q的多头网络
+2.修改DQNalgorithm算法，将其变为可返回三个张量（pred_q）的算法
+3.在agent.predict()中加权合并多张量
+4.修改agent.learn()和algorithm.learn()的部分规则。包括传入的reward变成了多个，如何合并他们
+
+在rpm过程中，算法将obs, action, reward, next_obs, done加到rpm池中.
+前两千次，rpm不learn，只积累数据
+当两千次满时，学习2000*50次。
+
+
+
+
+
+//////////
+Agent：差多Q函数的合并merge
+algorithm：修改完成
+Env：差feature3:loss的实现
+train：差feature和reward计算函数的接口
+
+//////////
+当前思路
+多reward->训练中learn到多loss->简单加权合并多loss，用多loss分别对应多个optimizer优化器，对应网络中的多个头（head）层。
+
+//////////
+还需要更改的：
+1.Agent.merge_q(self,q1,q2,q3):
+合并q1，q2，q3的方法（通过权重向量）
+
+2.env.step():
+三种feature的确定：
+第一种：原先的cost修改一下env.CalcuCostFin()(完成)
+第二种：通信延时的量化env.CalcuLoss()(完成)
+第三种：丢包率的量化env.CalcuDelay()
+
+3.train.run_single_episode():
+
+根据feature确定reward（三个）
