@@ -20,6 +20,7 @@ import parl
 
 from env import ContainerNumber
 from env import NodeNumber
+from weight import getWeightQfunc
 
 flag = []
 flag_temp = []
@@ -58,8 +59,8 @@ class Agent(parl.Agent):
         return act
 
     def merge_q(self,q1,q2,q3):
-
-
+        wq=getWeightQfunc()
+        merged_q=q1*wq[0]+q2*wq[1]+q3*wq[2]
         return merged_q
 
     def predict(self, obs):

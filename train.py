@@ -145,7 +145,11 @@ def run_train_episode(agent, env, rpm):
         # ------------
         feature1_temp = feature1  # feature1（cost&var）为即时型
         feature2_temp += feature2  # feature2（通信延迟）为累加型
-        feature3_temp = feature3```
+        feature3_temp += feature3  # feature3（丢包率）为平均型
+
+        reward1 = 0
+        reward2 = 0
+        reward3 = 0
         if flag1 == 0:
             if step == 6:
                 # 如果是第一个episode，直接存入
@@ -153,10 +157,7 @@ def run_train_episode(agent, env, rpm):
                 if feature1_temp > 0 and feature2_temp > 0 and feature3_temp > 0:
                     min_feature1 = feature1_temp
                     min_feature2 += feature2_temp
-                    min_feature3 += feature3```
-                    reward1 = 0
-                    reward2 = 0
-                    reward3 = 0
+                    min_feature3 += feature3_temp
 
                 else:
                     flag1 += 1
@@ -170,9 +171,9 @@ def run_train_episode(agent, env, rpm):
             if step == 6:
                 # feature1：35左右
                 # feature2：35左右
-                # feature3：
+                # feature3：35左右
                 feature2 = feature2_temp
-                ```
+                feature3 = feature3_temp / ContainerNumber
                 reward1, reward2, reward3, min_feature1, min_feature2, min_feature3 = Culreward(feature1, feature2,
                                                                                                 feature3, min_feature1,
                                                                                                 min_feature2,
@@ -219,7 +220,7 @@ def main():
     global sc_comm, sc_var
     env = Env()
     obs_shape = ContainerNumber * (ResourceType + 1) + NodeNumber * (
-            ContainerNumber + 2)  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
+            ContainerNumber + 3)  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
     action_dim = ContainerNumber * NodeNumber
 
     rpm = ReplayMemory(MEMORY_SIZE)  # Target1的经验回放池
@@ -258,14 +259,23 @@ def main():
         r3_list = []
         ravg_list = []
         with open("cost.txt", "a") as f:
-            f.write("开始训练 \n")
+            f.write("开始训练 round:" + str(round) + "\n")
         for i in range(50):
             f1, f2, f3, favg, r1, r2, r3, ravg = run_train_episode(agent, env, rpm)
             f1_list.append(f1)
             f2_list.append(f2)
             f3_list.append(f3)
             favg_list.append(favg)
+            r1_list.append(r1)
+            r2_list.append(r2)
+            r3_list.append(r3)
+            ravg_list.append(ravg)
             round += 1
+            print("ep,round:"+str(ep)+" "+str(round))
+            if (round < 50):
+                with open("cost.txt", "a") as f:
+                    f.write("round=%d,f1=%.6f,f2=%.6f,f3=%.6f,favg=%.6f,r1=%.6f,r2=%.6f,r3=%.6f,ravg=%.6f \n" % (
+                    round, f1, f2, f3, favg, r1, r2, r3, ravg))
 
         # test part       render=True 查看显示效果
         # eval_reward = run_evaluate_episodes(agent, env, render=False)
@@ -275,13 +285,15 @@ def main():
         with open("cost.txt", "a") as f:
             f.write("round=%d,f1=%.6f,f2=%.6f,f3=%.6f,favg=%.6f,r1=%.6f,r2=%.6f,r3=%.6f,ravg=%.6f \n" % (
                 round, sum(f1_list) / len(f1_list), sum(f2_list) / len(f2_list), sum(f3_list) / len(f3_list),
-                sum(favg_list) / len(favg_list), sum(r1_list) / len(r1_list), sum(r2_list) / len(r2_list),
+                sum(favg_list) / len(favg_list),
+                sum(r1_list) / len(r1_list),
+                sum(r2_list) / len(r2_list),
                 sum(r3_list) / len(r3_list), sum(ravg_list) / len(ravg_list)))
         root_logger = logging.getLogger()
         for h in root_logger.handlers[:]:
             root_logger.removeHandler(h)
         logging.basicConfig(level=logging.INFO, filename='a.log')
-        logging.info('round:{} e_greed:{} CostAvg: {} RewardAvg:{} Action:{}'.format(
+        logging.info('round:{} e_greed:{} FeatureAvg: {} RewardAvg:{} Action:{}'.format(
             round, agent.e_greed, sum(favg_list) / len(favg_list), sum(ravg_list) / len(ravg_list), env.action_queue))
 
     # 训练结束，保存模型

@@ -97,27 +97,27 @@ class DQN(parl.Algorithm):
 
         # 从target_model中获取 max Q' 的值，用于计算target_Q
         with paddle.no_grad():
-            max_v1 = self.target_model(next_obs).max(1, keepdim=True)
+            max_v1 = self.target_model(next_obs)[0].max(1, keepdim=True)
             target1 = reward1 + (1 - terminal) * self.gamma * max_v1
         loss1 = self.mse_loss(pred_value1, target1)
         with paddle.no_grad():
-            max_v2 = self.target_model(next_obs).max(1, keepdim=True)
+            max_v2 = self.target_model(next_obs)[1].max(1, keepdim=True)
             target2 = reward2 + (1 - terminal) * self.gamma * max_v2
         loss2 = self.mse_loss(pred_value2, target2)
         with paddle.no_grad():
-            max_v3 = self.target_model(next_obs).max(1, keepdim=True)
+            max_v3 = self.target_model(next_obs)[2].max(1, keepdim=True)
             target3 = reward3 + (1 - terminal) * self.gamma * max_v3
         loss3 = self.mse_loss(pred_value3, target3)
 
         # 计算每个 Q(s,a) 与 target_Q的均方差，得到loss
         # 训练头部1
         self.optimizer1.clear_grad()
-        loss1.backward()
+        loss1.backward(retain_graph=True)
         self.optimizer1.step()
 
         # 训练头部2
         self.optimizer2.clear_grad()
-        loss2.backward()
+        loss2.backward(retain_graph=True)
         self.optimizer2.step()
 
         # 训练头部3

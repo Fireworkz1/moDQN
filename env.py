@@ -6,6 +6,7 @@ service_containernum = [1, 1, 3, 1]  # 每种服务需要启动的容器数量�
 service_container = [[0], [1], [2, 3, 4], [5]]  # 每种服务对应的容器编号（按编号索引）
 service_container_relationship = [0, 1, 2, 2, 2, 3]  # 上面两个数组的对应
 node_delay = [100, 200, 200, 100, 150]  # 每个节点的延迟
+node_loss = [1.3, 1.2, 0.8, 1.5, 0.8]  # 每个节点的丢包%
 alpha = 0.5  # reward weighting factor
 beta = [0.333, 0.333, 0.333]
 count = 0
@@ -39,7 +40,7 @@ class Env():
 
         for i in range(NodeNumber):
             # self.node_state_queue.extend([0, 0, 0, 0, 0, 0, 0, 0])
-            self.node_state_queue.extend([0] * (ContainerNumber + 2))  # 微服务启动容器数+2
+            self.node_state_queue.extend([0] * (ContainerNumber + 3))  # 微服务启动容器数+3
         self.State = self.container_state_queue + self.node_state_queue
         self.action = [-1, -1]
         self.action_queue = [-1, -1]
@@ -55,8 +56,8 @@ class Env():
         # to calculate the distance between container i and j
         m = -1
         n = -1
-        m = self.container_state_queue[i * (ServiceNumber+1)]
-        n = self.container_state_queue[j * (ServiceNumber+1)]
+        m = self.container_state_queue[i * (ResourceType + 1)]
+        n = self.container_state_queue[j * (ResourceType + 1)]
 
         p = service_container_relationship[i]
         q = service_container_relationship[j]
@@ -89,9 +90,9 @@ class Env():
         NodeBandWith = []
         Var = 0
         for i in range(NodeNumber):
-            U = self.node_state_queue[i * (ContainerNumber + 2) + ContainerNumber]
-            M = self.node_state_queue[i * (ContainerNumber + 2) + (ContainerNumber + 1)]
-            B = self.node_state_queue[i * (ContainerNumber + 2) + (ContainerNumber + 2)]
+            U = self.node_state_queue[i * (ContainerNumber + 3) + ContainerNumber]
+            M = self.node_state_queue[i * (ContainerNumber + 3) + (ContainerNumber + 1)]
+            B = self.node_state_queue[i * (ContainerNumber + 3) + (ContainerNumber + 2)]
             NodeCPU.append(U)
             NodeMemory.append(M)
             NodeBandWith.append(B)
@@ -119,10 +120,10 @@ class Env():
             # update container state
             self.container_state_queue[self.action[1] * (ResourceType + 1)] = self.action[0]
             # update node state
-            self.node_state_queue[self.action[0] * (ContainerNumber + 2) + self.action[1]] = 1
-            self.node_state_queue[self.action[0] * (ContainerNumber + 2) + ContainerNumber] += \
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + self.action[1]] = 1
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + ContainerNumber] += \
                 self.container_state_queue[self.action[1] * (ResourceType + 1) + 1]
-            self.node_state_queue[self.action[0] * (ContainerNumber + 2) + (ContainerNumber + 1)] += \
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + (ContainerNumber + 1)] += \
                 self.container_state_queue[self.action[1] * (ResourceType + 1) + 2]
             self.action_queue.append(self.action)
         else:
@@ -136,13 +137,14 @@ class Env():
         return self.State
 
     def CalcuLoss(self):
-
-        return feature3
+        loss = node_loss[self.action[0]]
+        feature = (4 - loss) * 12
+        return feature
 
     def CalcuDelay(self):
         # act[0]为部署在几号节点上，act[1]为部署第几个微服务容器实例
         delay = node_delay[self.action[0]]
-        feature = (500 - delay) / 60
+        feature = (500 - delay) / 10 / ContainerNumber
         return feature
 
     def step(self, action):
@@ -152,16 +154,16 @@ class Env():
         self.action = self.index_to_act(action)
         self.update()
 
-        feature1 = self.CalcuCostFin()#35左右
-        feature2 = self.CalcuDelay()#35/6左右
-        feature3 = self.CalcuLoss()
+        feature1 = self.CalcuCostFin()  # 35左右
+        feature2 = self.CalcuDelay()    # 35/6左右
+        feature3 = self.CalcuLoss()     # 35/6左右
 
         done = False
         count = 0
 
         # 判断当前为第几步,用来判断是否完成迭代
         for i in range(ContainerNumber):
-            if self.container_state_queue[(ServiceNumber + 1) * i] != -1:
+            if self.container_state_queue[(ResourceType + 1) * i] != -1:
                 count += 1
         if count == ContainerNumber:
             done = True
