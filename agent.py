@@ -18,6 +18,7 @@ import numpy as np
 import paddle
 import parl
 
+
 from env import ContainerNumber
 from env import NodeNumber
 from weight import getWeightQfunc
@@ -30,10 +31,12 @@ for o in range(ContainerNumber * NodeNumber):
 
 
 class Agent(parl.Agent):
-    def __init__(self, algorithm, act_dim, e_greed=0.1, e_greed_decrement=0):
-        super(Agent, self).__init__(algorithm)
+    def __init__(self, algorithm_1, algorithm_2, algorithm_3, act_dim, e_greed=0.1, e_greed_decrement=0):
+        super(Agent, self).__init__(algorithm_1)
         assert isinstance(act_dim, int)
         self.act_dim = act_dim
+        self.alg_2 = algorithm_2
+        self.alg_3 = algorithm_3
 
         self.global_step = 0
         self.update_target_steps = 200  # 每隔200个training steps再把model的参数复制到target_model中
@@ -67,10 +70,9 @@ class Agent(parl.Agent):
         """ 根据观测值 obs 选择最优动作
         """
         obs = paddle.to_tensor(obs, dtype='float32')
-        pred_q = self.alg.predict(obs)
-        pred_q1 = pred_q[0]
-        pred_q2 = pred_q[1]
-        pred_q3 = pred_q[2]
+        pred_q1 = self.alg.predict(obs[0:-12])
+        pred_q2 = self.alg_2.predict(obs[-12:-6])
+        pred_q3 = self.alg_3.predict(obs[-6:])
 
         merged_q=self.merge_q(pred_q1,pred_q2,pred_q3)
         # 如果后面要修改多目标q函数从这里改
@@ -94,6 +96,8 @@ class Agent(parl.Agent):
         """
         if self.global_step % self.update_target_steps == 0:
             self.alg.sync_target()
+            self.alg_2.sync_target()
+            self.alg_3.sync_target()
         self.global_step += 1
 
         act = np.expand_dims(act, axis=-1)
@@ -109,5 +113,7 @@ class Agent(parl.Agent):
         reward3 = paddle.to_tensor(reward3, dtype='float32')
         next_obs = paddle.to_tensor(next_obs, dtype='float32')
         terminal = paddle.to_tensor(terminal, dtype='float32')
-        loss, loss1, loss2, loss3 = self.alg.learn(obs, act, reward1, reward2, reward3, next_obs, terminal)  # 训练一次网络
-        return float(loss), float(loss1), float(loss2), float(loss3)
+        loss_1 = self.alg.learn(obs[:, :69], act, reward1, next_obs[:, :69], terminal)  # 训练一次网络
+        loss_2 = self.alg_2.learn(obs[:,-12:-6], act, reward2, next_obs[:,-12:-6], terminal)
+        loss_3 = self.alg_3.learn(obs[:,-6:], act, reward3, next_obs[:,-6:], terminal)
+        return float(loss_1), float(loss_2), float(loss_3)

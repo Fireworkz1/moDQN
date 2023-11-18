@@ -6,13 +6,13 @@ service_containernum = [1, 1, 3, 1]  # 每种服务需要启动的容器数量�
 service_container = [[0], [1], [2, 3, 4], [5]]  # 每种服务对应的容器编号（按编号索引）
 service_container_relationship = [0, 1, 2, 2, 2, 3]  # 上面两个数组的对应
 node_delay = [100, 200, 200, 100, 150]  # 每个节点的延迟
-node_loss = [1.3, 1.2, 0.8, 1.5, 0.8]  # 每个节点的丢包%
+node_loss = [23, 12, 8, 15, 8]  # 每个节点的丢包%
 alpha = 0.5  # reward weighting factor
 beta = [0.333, 0.333, 0.333]
 count = 0
 CPUnum = 4
 Mem = CPUnum * 1024
-BandWidth = 1
+BandWidth = 5
 e_greed = 0.2  # 模型学习率
 e_greed_decrement = 1e-6
 
@@ -27,21 +27,25 @@ class Env():
         self.node_state_queue = []
         self.container_state_queue = []
         self.action_queue = []
+        self.loss_state_query = []
+        self.delay_state_query = []
         self.prepare()
 
     def prepare(self):
 
-        self.container_state_queue = [-1, 0.5 / CPUnum, 128 / Mem, 1 / BandWidth,
+        self.container_state_queue = [-1, 0.5 / CPUnum, 128 / Mem, 2 / BandWidth,
+                                      -1, 0.5 / CPUnum, 256 / Mem, 2 / BandWidth,
+                                      -1, 0.5 / CPUnum, 256 / Mem, 2 / BandWidth,
                                       -1, 0.5 / CPUnum, 256 / Mem, 1 / BandWidth,
-                                      -1, 0.5 / CPUnum, 256 / Mem, 1 / BandWidth,
-                                      -1, 0.5 / CPUnum, 256 / Mem, 1 / BandWidth,
-                                      -1, 0.5 / CPUnum, 256 / Mem, 1 / BandWidth,
+                                      -1, 0.5 / CPUnum, 256 / Mem, 2 / BandWidth,
                                       -1, 0.5 / CPUnum, 128 / Mem, 1 / BandWidth]  # 设置硬件条件
 
         for i in range(NodeNumber):
             # self.node_state_queue.extend([0, 0, 0, 0, 0, 0, 0, 0])
-            self.node_state_queue.extend([0] * (ContainerNumber + 3))  # 微服务启动容器数+3
-        self.State = self.container_state_queue + self.node_state_queue
+            self.node_state_queue.extend([0,0,0,0,0,0,0,0,0])  # 微服务启动容器数+3
+        self.loss_state_query = [0,0,0,0,0,0]
+        self.delay_state_query = [0,0,0,0,0,0]
+        self.State = self.container_state_queue + self.node_state_queue + self.loss_state_query + self.delay_state_query
         self.action = [-1, -1]
         self.action_queue = [-1, -1]
 
@@ -111,8 +115,8 @@ class Env():
         re += alpha * g1 + (1 - alpha) * g2
         return 100 * re
 
-    def state_update(self, container_state_queue, node_state_queue):
-        self.State = container_state_queue + node_state_queue
+    def state_update(self, container_state_queue, node_state_queue, loss_state_query, delay_state_query):
+        self.State = container_state_queue + node_state_queue + loss_state_query + delay_state_query
 
     def update(self):
         # update state
@@ -121,31 +125,34 @@ class Env():
             self.container_state_queue[self.action[1] * (ResourceType + 1)] = self.action[0]
             # update node state
             self.node_state_queue[self.action[0] * (ContainerNumber + 3) + self.action[1]] = 1
-            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + ContainerNumber] += \
-                self.container_state_queue[self.action[1] * (ResourceType + 1) + 1]
-            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + (ContainerNumber + 1)] += \
-                self.container_state_queue[self.action[1] * (ResourceType + 1) + 2]
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + ContainerNumber] += self.container_state_queue[self.action[1] * (ResourceType + 1) + 1]
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + (ContainerNumber + 1)] += self.container_state_queue[self.action[1] * (ResourceType + 1) + 2]
+            self.node_state_queue[self.action[0] * (ContainerNumber + 3) + (ContainerNumber + 2)] += self.container_state_queue[self.action[1] * (ResourceType + 1) + 3]
+            self.loss_state_query[self.action[1]] = node_loss[self.action[0]]
+            self.delay_state_query[self.action[1]] = node_delay[self.action[0]]
             self.action_queue.append(self.action)
         else:
             print("invalid action")
             self.node_state_queue = []
             self.container_state_queue = []
+            self.delay_state_query = []
+            self.loss_state_query = []
             self.action_queue = []
 
             self.prepare()
-        self.state_update(self.container_state_queue, self.node_state_queue)
+        self.state_update(self.container_state_queue, self.node_state_queue, self.loss_state_query, self.delay_state_query)
         return self.State
 
-    def CalcuLoss(self):
-        loss = node_loss[self.action[0]]
-        feature = (4 - loss) * 12
-        return feature
+    # def CalcuLoss(self):
+    #     loss = node_loss[self.action[0]]
+    #     feature = (40 - loss) * 12
+    #     return feature
 
-    def CalcuDelay(self):
-        # act[0]为部署在几号节点上，act[1]为部署第几个微服务容器实例
-        delay = node_delay[self.action[0]]
-        feature = (500 - delay) / 10 / ContainerNumber
-        return feature
+    # def CalcuDelay(self):
+    #     # act[0]为部署在几号节点上，act[1]为部署第几个微服务容器实例
+    #     delay = node_delay[self.action[0]]
+    #     feature = (500 - delay) / 10 / ContainerNumber
+    #     return feature
 
     def step(self, action):
         # input: action(Targetnode，ContainerIndex)
@@ -155,8 +162,8 @@ class Env():
         self.update()
 
         feature1 = self.CalcuCostFin()  # 35左右
-        feature2 = self.CalcuDelay()    # 35/6左右
-        feature3 = self.CalcuLoss()     # 35/6左右
+        feature2 = sum(self.loss_state_query)   # 35/6左右
+        feature3 = sum(self.delay_state_query)     # 35/6左右
 
         done = False
         count = 0
@@ -168,6 +175,7 @@ class Env():
         if count == ContainerNumber:
             done = True
 
+        # 返回当前的状态、通信开销以及资源方差、loss和、延迟和
         return self.State, feature1, feature2, feature3, done
 
     def reset(self):

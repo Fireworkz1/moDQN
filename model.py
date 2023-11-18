@@ -22,34 +22,22 @@ import parl
 
 class Model(parl.Model):
     """ 使用全连接网络.
-
-    参数:
-        obs_dim (int): 观测空间的维度.
-        act_dim (int): 动作空间的维度.
     """
 
-    def __init__(self, obs_dim, act_dim):
+    def __init__(self, input_dim, hid_1, hid_2, act_dim):
         super(Model, self).__init__()
-        hid1_size = 128
-        hid2_size = 128
+        hid1_size = hid_1
+        hid2_size = hid_2
         # 3层全连接层
         # 三头网络
-        self.fc1 = nn.Linear(obs_dim, hid1_size)
-        self.fc2 = nn.Linear(hid1_size, hid2_size)
-        # self.fc3 = nn.Linear(hid2_size, act_dim)
-        self.head1 = nn.Linear(hid2_size, act_dim)
-        self.head2 = nn.Linear(hid2_size, act_dim)
-        self.head3 = nn.Linear(hid2_size, act_dim)
+        self.fc1 = nn.Linear(input_dim, hid1_size)
+        self.fc2 = nn.Linear(hid1_size, hid2_size)    
+        self.fc3 = nn.Linear(hid2_size, act_dim)
 
     def forward(self, obs):
         h1 = F.relu(self.fc1(obs))
         h2 = F.relu(self.fc2(h1))
-        # Q = self.fc3(h2)
-        # return Q
-        Q1 = self.head1(h2)
-        Q2 = self.head2(h2)
-        Q3 = self.head3(h2)
-
-        return Q1, Q2, Q3
+        Q = self.fc3(h2)
+        return Q
 
 

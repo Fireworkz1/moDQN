@@ -48,6 +48,12 @@ ep = 0
 # allCost = [[], [], [], [], [], []]
 allReward = [[], [], [], [], [], []]
 
+# 越到后面优化越难，奖励越多，
+global_reward_1 = 0
+global_reward_2 = 0
+global_reward_3 = 0
+
+
 test_evareward = 0
 # ------------
 min_feature1 = 100000000000
@@ -99,6 +105,9 @@ def run_train_episode(agent, env, rpm):
     global min_feature2
     global min_feature3
 
+    global global_reward_1
+    global global_reward_2
+    global global_reward_3
     obs_list = []
     next_obslist = []
     action_list = []
@@ -118,11 +127,6 @@ def run_train_episode(agent, env, rpm):
         flag_temp[o] = 0
         flag[o] = 0
     flag1 -= 1
-    # ------------
-    feature1_temp = 0
-    feature2_temp = 0
-    feature3_temp = 0
-
     while True:
 
         step += 1
@@ -143,10 +147,6 @@ def run_train_episode(agent, env, rpm):
         done_list.append(done)
 
         # ------------
-        feature1_temp = feature1  # feature1（cost&var）为即时型
-        feature2_temp += feature2  # feature2（通信延迟）为累加型
-        feature3_temp += feature3  # feature3（丢包率）为平均型
-
         reward1 = 0
         reward2 = 0
         reward3 = 0
@@ -154,10 +154,10 @@ def run_train_episode(agent, env, rpm):
             if step == 6:
                 # 如果是第一个episode，直接存入
                 # 如果feature不好，则舍弃这一个episode，下一个episode看作第一个episode
-                if feature1_temp > 0 and feature2_temp > 0 and feature3_temp > 0:
-                    min_feature1 = feature1_temp
-                    min_feature2 += feature2_temp
-                    min_feature3 += feature3_temp
+                if feature1 > 0:
+                    min_feature1 = feature1
+                    min_feature2 += feature2
+                    min_feature3 += feature3
 
                 else:
                     flag1 += 1
@@ -172,13 +172,15 @@ def run_train_episode(agent, env, rpm):
                 # feature1：35左右
                 # feature2：35左右
                 # feature3：35左右
-                feature2 = feature2_temp
-                feature3 = feature3_temp / ContainerNumber
-                reward1, reward2, reward3, min_feature1, min_feature2, min_feature3 = Culreward(feature1, feature2,
-                                                                                                feature3, min_feature1,
-                                                                                                min_feature2,
-                                                                                                min_feature3)
+                reward1, reward2, reward3, avg_f1,avg_f2,avg_f3= Culreward(feature1, feature2, feature3, min_feature1, min_feature2, min_feature3)
 
+                root_logger = logging.getLogger()
+                for h in root_logger.handlers[:]:
+                    root_logger.removeHandler(h)
+                logging.basicConfig(level=logging.INFO, filename='b.log')
+                logging.info(
+                    'episode:{} step:{} F1:{} F2:{} F3:{} R1:{} R2:{} R3:{},AvgF1:{} ,AvgF2:{} ,AvgF3:{} '.format(
+                        ep, step, feature1, feature2, feature3, reward1, reward2,reward3,avg_f1,avg_f2,avg_f3))
                 for i in range(6):
                     rpm.append(
                         (obs_list[i], action_list[i], reward1, reward2, reward3, next_obslist[i], done_list[i]))
@@ -199,37 +201,37 @@ def run_train_episode(agent, env, rpm):
             (batch_obs, batch_action, batch_reward1, batch_reward2, batch_reward3, batch_next_obs,
              batch_done) = rpm.sample(BATCH_SIZE)
 
-            train_loss, loss1, loss2, loss3 = agent.learn(batch_obs, batch_action, batch_reward1, batch_reward2,
+            loss1, loss2, loss3 = agent.learn(batch_obs, batch_action, batch_reward1, batch_reward2,
                                                           batch_reward3,
                                                           batch_next_obs,
                                                           batch_done)  # s,a,r,s',done
             with open("trainloss.txt", "a") as f:
-                f.write("ep:%d,loss:%.3f,loss1:%.3f,loss2:%.3f,loss3:%.3f \n" % (ep, train_loss, loss1, loss2, loss3))
+                f.write("ep:%d,loss1:%.3f,loss2:%.3f,loss3:%.3f \n" % (ep, loss1, loss2, loss3))
         obs = next_obs
         if done:
             break
-    w = getWeightReward()
-    featureAvg = feature1 * w[0] + feature2 * w[1] + feature3 * w[2]
-    featureAvg /= sum(w)
-    rewardAvg = reward1 * w[0] + reward2 * w[1] + reward3 * w[2]
-    rewardAvg /= sum(w)
-    return feature1, feature2, feature3, featureAvg, reward1, reward2, reward3, rewardAvg
+
+    return feature1, feature2, feature3,  avg_f1,avg_f2,avg_f3
 
 
 def main():
     global sc_comm, sc_var
     env = Env()
     obs_shape = ContainerNumber * (ResourceType + 1) + NodeNumber * (
-            ContainerNumber + 3)  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
+            ContainerNumber + 3) + ContainerNumber * 2  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
     action_dim = ContainerNumber * NodeNumber
 
     rpm = ReplayMemory(MEMORY_SIZE)  # Target1的经验回放池
 
     # 根据parl框架构建agent
-    model = Model(obs_dim=obs_shape, act_dim=action_dim)
-    algorithm = DQN(model, gamma=GAMMA, lr=LEARNING_RATE)
+    model_1 = Model(obs_shape-12, 128, 128,action_dim)
+    model_2 = Model(6, 128, 128,action_dim)
+    model_3 = Model(6, 128, 128,action_dim)
+    algorithm_1 = DQN(model_1,gamma=GAMMA, lr=LEARNING_RATE)
+    algorithm_2 = DQN(model_2,gamma=GAMMA, lr=LEARNING_RATE)
+    algorithm_3 = DQN(model_3,gamma=GAMMA, lr=LEARNING_RATE)
     agent = Agent(
-        algorithm,
+        algorithm_1, algorithm_2, algorithm_3,
         act_dim=action_dim,
         e_greed=e_greed,  # 有一定概率随机选取动作，探索
         e_greed_decrement=e_greed_decrement)  # type: ignore # 随着训练逐步收敛，探索的程度慢慢降低
