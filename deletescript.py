@@ -1,7 +1,7 @@
 import os
 
 # 定义要删除的文件列表
-files_to_delete = ['a.log', 'cost.txt','details.log','trainloss.txt','mdqn_model.ckpt','b.log']
+files_to_delete = [ 'cost.txt','trainloss.txt','mdqn_model.ckpt','feature-reward.log']
 
 # 获取当前目录
 current_directory = os.getcwd()

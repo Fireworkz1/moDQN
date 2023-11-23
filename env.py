@@ -12,7 +12,7 @@ beta = [0.333, 0.333, 0.333]
 count = 0
 CPUnum = 4
 Mem = CPUnum * 1024
-BandWidth = 5
+BandWidth = 3
 e_greed = 0.2  # 模型学习率
 e_greed_decrement = 1e-6
 
@@ -100,7 +100,7 @@ class Env():
             NodeCPU.append(U)
             NodeMemory.append(M)
             NodeBandWith.append(B)
-            if NodeCPU[i] > 1 or NodeMemory[i] > 1 or NodeBandWith[i] > 1:
+            if NodeCPU[i] > 1 or NodeMemory[i] > 1 or NodeBandWith[i] > BandWidth:
                 Var -= 10
                 # Variance of node load
         Var += beta[0] * np.var(NodeCPU) + beta[1] * np.var(NodeMemory) + beta[2] * np.var(NodeBandWith)

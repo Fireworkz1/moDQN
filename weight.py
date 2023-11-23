@@ -3,7 +3,7 @@ def getWeightLoss():
 
 
 def getWeightReward():
-    return 1 / 3, 1 / 3, 1 / 3
+    return 1, 1 / 5, 1 / 5
 
 
 def getWeightQfunc():

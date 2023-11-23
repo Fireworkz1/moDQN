@@ -70,9 +70,9 @@ class Agent(parl.Agent):
         """ 根据观测值 obs 选择最优动作
         """
         obs = paddle.to_tensor(obs, dtype='float32')
-        pred_q1 = self.alg.predict(obs[0:-12])
-        pred_q2 = self.alg_2.predict(obs[-12:-6])
-        pred_q3 = self.alg_3.predict(obs[-6:])
+        pred_q1 = self.alg.predict(obs)
+        pred_q2 = self.alg_2.predict(obs)
+        pred_q3 = self.alg_3.predict(obs)
 
         merged_q=self.merge_q(pred_q1,pred_q2,pred_q3)
         # 如果后面要修改多目标q函数从这里改
@@ -113,7 +113,7 @@ class Agent(parl.Agent):
         reward3 = paddle.to_tensor(reward3, dtype='float32')
         next_obs = paddle.to_tensor(next_obs, dtype='float32')
         terminal = paddle.to_tensor(terminal, dtype='float32')
-        loss_1 = self.alg.learn(obs[:, :69], act, reward1, next_obs[:, :69], terminal)  # 训练一次网络
-        loss_2 = self.alg_2.learn(obs[:,-12:-6], act, reward2, next_obs[:,-12:-6], terminal)
-        loss_3 = self.alg_3.learn(obs[:,-6:], act, reward3, next_obs[:,-6:], terminal)
+        loss_1 = self.alg.learn(obs, act, reward1, next_obs, terminal)  # 训练一次网络
+        loss_2 = self.alg_2.learn(obs, act, reward2, next_obs, terminal)
+        loss_3 = self.alg_3.learn(obs, act, reward3, next_obs, terminal)
         return float(loss_1), float(loss_2), float(loss_3)

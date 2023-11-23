@@ -1,105 +1,87 @@
-times = 10
+times = 100
 from weight import getWeightReward
+#from train import ep
+ep=0
+min1=0
+min2=0
+min3=0
+max1=0
+max2=0
+max3=0
+def reward1cal(feature,min,max):
 
-avg_feature1 = 0
-avg_feature2 = 0
-avg_feature3 = 0
-
-ep = 0
-ep1 = 0
-
-
-def reward1cal(feature, avg_f, ep):
-    global ep1
-
-    if feature < 0:
-        reward = -10000
-        return reward, avg_f
-    ep1 += 1
-    if ep1 == 1:
-        avg_f = feature
-    if feature < avg_f:
-        reward = 50 + 100 * (avg_f - feature)
+    reward=0
+    if ep==1:
+        if feature<0:
+            return -100,75,75
+        else:
+            return 0,feature,feature
+    if feature<0:
+        return -100,min,max
     else:
-        reward = 100 * (avg_f - feature)
-    avg_f = (avg_f * (ep1 - 1) + feature) / ep1
-    return reward, avg_f
+        if min==max==feature:
+            return 0,feature,feature
+        if feature<min:
+            min=feature
+            reward+=1
+        elif feature>max:
+            max=feature
+            reward-=1
+
+        reward=reward+(max-feature)/(max-min)
 
 
-# if feature < 0:
-#     reward = -200
-# elif abs(feature - min) < 0.0001:
-#     reward = 0
-# elif feature < min:
-#     reward = 100
-#     min = feature
-# else:
-#     reward = times * (min - feature)
-# return reward, min
+    return reward,min,max
 
 
-def reward2cal(feature, avg_f, ep):
+def reward2cal(feature,min,max):
+
+    reward = 0
+    if ep==1:
+        return 0,feature,feature
+    else:
+        if min==max==feature:
+            return 0,feature,feature
+        if feature<min:
+            min=feature
+            reward+=1
+        elif feature>max:
+            max=feature
+            reward-=1
+
+        reward=reward+(max-feature)/(max-min)
+    return reward,min,max
+
+
+def reward3cal(feature,min,max):
+    global min3
+    global max3
+    reward = 0
     if ep == 1:
-        avg_f = feature
-    if feature < avg_f:
-        reward = 50 + 100 * (avg_f - feature)
+        return 0, feature, feature
     else:
-        reward = 100 * (avg_f - feature)
-    avg_f = (avg_f * (ep - 1) + feature) / ep
-    return reward, avg_f
+        if min==max==feature:
+            return 0,feature,feature
+        if feature<min:
+            min=feature
+            reward+=1
+        elif feature>max:
+            max=feature
+            reward-=1
+
+        reward=reward+(max-feature)/(max-min)
+    return reward,min,max
 
 
-# if feature < 0:
-#     reward = -100
-# elif abs(feature - min) < 0.0001:
-#     reward = 0
-# elif feature < min:
-#     reward = 100
-#     min = feature
-# else:
-#     reward = times* (min - feature)
-# return reward, min
+
+def Culreward(f1, f2, f3):
+    global min1,min2,min3,max1,max2,max3, ep
+
+    ep+=1
+    r1,min1,max1 = reward1cal(f1,min1,max1)
+    r2,min2,max2 = reward2cal(f2,min2,max2)
+    r3,min3,max3 = reward3cal(f3,min3,max3)
 
 
-def reward3cal(feature, avg_f, ep):
-    if ep == 1:
-        avg_f = feature
 
-    if feature < avg_f:
-        reward = 50 + 100 * (avg_f - feature)
-    else:
-        reward = 100 * (avg_f - feature)
-    avg_f = (avg_f * (ep - 1) + feature) / ep
-    return reward, avg_f
-
-
-# if feature < 0:
-#     reward = -100
-# elif abs(feature - min) < 0.0001:
-#     reward = 0
-# elif feature < min:
-#     reward = 100
-#     min = feature
-# else:
-#     reward = times * (min - feature)
-# return reward, min
-
-
-def Culreward(f1, f2, f3, mf1, mf2, mf3):
-    global ep
-    global avg_feature1
-    global avg_feature2
-    global avg_feature3
-
-    ep += 1
-
-    r1, avg_feature1 = reward1cal(f1, avg_feature1, ep)
-    r2, avg_feature2 = reward2cal(f2, avg_feature2, ep)
-    r3, avg_feature3 = reward3cal(f3, avg_feature3, ep)
-
-    w = getWeightReward()
-    r1 = r1 * w[0]
-    r2 = r2 * w[1]
-    r3 = r3 * w[2]
-
-    return r1, r2, r3, avg_feature1, avg_feature2, avg_feature3
+    return r1, r2, r3
