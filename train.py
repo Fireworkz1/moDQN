@@ -28,10 +28,10 @@ from env import ResourceType
 from env import e_greed
 from env import e_greed_decrement
 from model import Model
+from pareto import getPareto
 from replay_memory import ReplayMemory
 from reward import Culreward
-from weight import getWeightReward
-
+from show import showPareto
 # 检查版本
 
 LEARN_FREQ = 6  # learning frequency
@@ -40,7 +40,9 @@ MEMORY_WARMUP_SIZE = 2000
 BATCH_SIZE = 30
 LEARNING_RATE = 0.001
 GAMMA = 0.9
-
+pareto_set = []
+feature_set = []
+act_pareto_set = []
 sc_comm = 0
 sc_var = 0
 flag1 = 1
@@ -48,7 +50,8 @@ ep = 0
 round = 0
 # allCost = [[], [], [], [], [], []]
 allReward = [[], [], [], [], [], []]
-rewardavg=0
+rewardavg = 0
+
 
 # ------------
 # LEARN_FREQ = 5  # 训练频率，不需要每一个step都learn，攒一些新增经验后再learn，提高效率
@@ -144,7 +147,7 @@ def run_train_episode(agent, env, rpm):
 
             # 输出到日志
             rewardsum = reward1 + reward3 + reward2
-            rewardavg=(rewardsum+rewardavg*(ep-1))/ep
+            rewardavg = (rewardsum + rewardavg * (ep - 1)) / ep
 
             root_logger = logging.getLogger()
             for h in root_logger.handlers[:]:
@@ -169,17 +172,21 @@ def run_train_episode(agent, env, rpm):
         obs = next_obs
         if done:
             break
-
+    # 将action list转化为二元组形式
+    templist = []
+    for i in action_list:
+        act = [-1, -1]
+        act[0] = int(i / ContainerNumber)
+        act[1] = i % ContainerNumber
+        templist.append(act)
+    action_list = templist
     return feature1, feature2, feature3, reward1, reward2, reward3, action_list
-
-
-def calPareto(f1, f2, f3):
-    return
 
 
 def main():
     global sc_comm, sc_var
     global rewardavg
+    global act_pareto_set, pareto_set, feature_set
     env = Env()
     obs_shape = ContainerNumber * (ResourceType + 1) + NodeNumber * (
             ContainerNumber + 3) + ContainerNumber * 2  # *3对应containerstate数组，每个container三个值；后半对应nodestate数组
@@ -209,40 +216,47 @@ def main():
         # MEMORY_WARMUP_SIZE=2000
         run_train_episode(agent, env, rpm)
 
-    max_episode = 3000
-    pareto_set=[]
+    max_episode = 10000
+
     # start train
     global round
 
     while round < max_episode:  # 训练max_episode个回合，test部分不计算入episode数量
-        # train part
-
-        with open("cost.txt", "a") as f:
-            f.write("开始训练 round:" + str(round) + "\n")
-
-        f1, f2, f3, r1, r2, r3,action_list = run_train_episode(agent, env, rpm)
-        inPareto=calPareto(f1,f2,f3)
-        if inPareto:
-            actset=[]
-            for i in action_list:
-                act = [-1, -1]
-                act[0] = int(i / ContainerNumber)
-                act[1] = i % ContainerNumber
-                actset.append(act)
-            pareto_set.append(actset)
+        #1.train part
         round += 1
         print("ep,round:" + str(ep) + " " + str(round))
+        #2.训练
+        f1, f2, f3, r1, r2, r3, action_list = run_train_episode(agent, env, rpm)
 
-        if round>(max_episode-5):
+        #3.判断是否属于最优解集
+        solution = [[f1, f2, f3], round, action_list]
+        # set元素格式：[f1,f2,f3],round,[[],[],[],[],[],[]]]
+        feature_set.append(solution)
+        ispareto, pareto_set, removed_set = getPareto(feature_set, pareto_set, action_list)
+        if ispareto:
+            with open("pareto_details.txt", "a") as f:
+                f.write("在round:" + str(round) + "增加了一个最优解：" + str(solution[0]) + "\n")
+        if removed_set:
+            for r in removed_set:
+                with open("pareto_details.txt", "a") as f:
+                    f.write("在round:" + str(round) + "移除了一个最优解：" + str(r[0]) + "round=" + str(r[1]) + "\n")
+
+
+
+        #5.保存最后五次结果
+        if round > (max_episode - 5):
             with open("all_trains.txt", "a") as f:
-                f.write("final ravg" + str(rewardavg)+str(action_list) + "\n")
-
-    # 观察模型是否趋于较好结果
-
-    # 训练结束，保存模型
+                f.write("final ravg" + str(round) + " :" + str(rewardavg) + str(action_list) + "\n")
+    # 4.绘图
+    showPareto(pareto_set)
+    # 根据索引值从小到大排序pareto集合
+    pareto_set = sorted(pareto_set, key=lambda x: x[1])
+    # 训练结束，保存模型，保存pareto_set
+    with open("pareto_set.txt", "a") as f:
+        for a in pareto_set:
+            f.write("round:" + str(a[1]) + "; act:" + str(a[2]) + "; feature:" + str(a[0]) + "\n")
     save_path = './mdqn_model.ckpt'
     agent.save(save_path)
-
 
 
 if __name__ == '__main__':
