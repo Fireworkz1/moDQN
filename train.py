@@ -216,7 +216,7 @@ def main(param=0):
         # MEMORY_WARMUP_SIZE=2000
         run_train_episode(agent, env, rpm)
 
-    max_episode = 10000
+    max_episode = 3500
 
     # start train
     global round

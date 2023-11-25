@@ -32,7 +32,7 @@ for o in range(ContainerNumber * NodeNumber):
 
 
 class Agent(parl.Agent):
-    def __init__(self, algorithm_1, algorithm_2, algorithm_3, act_dim, e_greed=0.3, e_greed_decrement=0):
+    def __init__(self, algorithm_1, algorithm_2, algorithm_3, act_dim, e_greed=0.1, e_greed_decrement=0):
         super(Agent, self).__init__(algorithm_1)
         assert isinstance(act_dim, int)
         self.act_dim = act_dim
