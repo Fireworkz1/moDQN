@@ -57,5 +57,4 @@ def mergePareto(solution_set):
 
     return pareto_set, merged_count,same_count
 
-def calActionTimesFromPareto(pareto_set):
-    return
+

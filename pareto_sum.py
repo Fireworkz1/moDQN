@@ -80,7 +80,34 @@ def mergePareto_final():
             f.write("round:" + str(a[1]) + "; act:" + str(a[2]) + "; feature:" + str(a[0]) + "\n")
     return optimal_solutions
 
+
+def calActionTimesFromPareto():
+    file_path = 'pareto_final.txt'
+    optimal_solutions = read_optimal_solutions(file_path)
+    for o in optimal_solutions:
+        o[2]=sorted(o[2], key=lambda x: x[1])
+        for o in optimal_solutions:
+            o[2] = sorted(o[2], key=lambda x: x[1])
+    action_list=[]
+    index=0
+    for solution in optimal_solutions:
+        existed=False
+        if index!=0:
+            for action in action_list:
+                if action[0][2]==solution[2]:
+                    existed=True
+                    action.append(solution)
+                    break
+        if not existed:
+            index+=1
+            action_list.append([solution])
+
+    print(action_list)
+    print(index)
+    print("pareto_final解析完成")
+    return
 if __name__ == "__main__":
     pareto_set = mergePareto_set()
     mergePareto_final()
+    #calActionTimesFromPareto()
     showPareto(pareto_set)
