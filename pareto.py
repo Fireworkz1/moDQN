@@ -58,3 +58,22 @@ def mergePareto(solution_set):
     return pareto_set, merged_count,same_count
 
 
+def QPareto(solution_set):
+    pareto_set = []
+    for new_solution in solution_set:
+        is_dominated = False
+
+        # 检查新解是否被 Pareto 前沿中的解所支配
+        for existing_solution in pareto_set:
+            if dominates(existing_solution[0], new_solution[0]):
+                is_dominated = True
+
+                break
+
+        if not is_dominated:
+            # 如果新解不被支配，则将其添加到 Pareto 前沿
+            pareto_set = [sol for sol in pareto_set if not dominates(new_solution[0], sol[0])]
+            if new_solution[0] not in [row[0] for row in pareto_set]:
+                pareto_set.append(new_solution)
+
+    return pareto_set

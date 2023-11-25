@@ -20,7 +20,7 @@ algorithm.py
 model.py  
 replay_memory.py  
 自定义文件：  
-weight.py：getWeightQfunC():当前训练Q网络合并的权重  
+policy.py：设置选择Q网络的策略
 reward.py：设置reward  
 pareto.py:计算pareto前沿相关  
 show.py:画图  

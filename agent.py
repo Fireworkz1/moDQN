@@ -21,7 +21,8 @@ import parl
 
 from env import ContainerNumber
 from env import NodeNumber
-from weight import getWeightQfunc
+from policy import getQnetwork
+from  policy import  merge_q
 
 flag = []
 flag_temp = []
@@ -61,34 +62,25 @@ class Agent(parl.Agent):
             0.01, self.e_greed - self.e_greed_decrement)  # 随着训练逐步收敛，探索的程度慢慢降低
         return act
 
-    def merge_q(self,q1,q2,q3):
-        wq=getWeightQfunc()
-        merged_q=q1*wq[0]+q2*wq[1]+q3*wq[2]
-        return merged_q
+
 
     def predict(self, obs):
         """ 根据观测值 obs 选择最优动作
         """
+        global flag
+        global flag_temp
         obs = paddle.to_tensor(obs, dtype='float32')
         pred_q1 = self.alg.predict(obs)
         pred_q2 = self.alg_2.predict(obs)
         pred_q3 = self.alg_3.predict(obs)
 
-        merged_q=self.merge_q(pred_q1,pred_q2,pred_q3)
+        act,flag,flag_temp=getQnetwork(1,pred_q1,pred_q2,pred_q3,act_dim=self.act_dim,flag=flag,flag_temp=flag_temp)
+
         # 如果后面要修改多目标q函数从这里改
 
         # 下面这个函数返回的是采用不同act时对应的act在reward上的排名值，从小到大
         # 比如，[3.2, 1.5, 4.1, 2.7 ]调用后为[1,3,0,2]
-        merged_q_index = np.argsort(merged_q)
-        # act为preq中的最大值原先对应的索引,原来的列表里第index[i]位 是第i小的数(较大的)
-        act = merged_q_index[self.act_dim - 1]
-        i = 1
-        while flag[act] == 1 or flag_temp[act % ContainerNumber] == 1:
-            i += 1
-            act = merged_q_index[self.act_dim - i]  # 选择Q最大的下标，即对应的动作
-        flag[act] = 1
-        flag_temp[act] = 1
-        flag_temp[act % ContainerNumber] = 1
+
         return act
 
     def learn(self, obs, act, reward1, reward2, reward3, next_obs, terminal):

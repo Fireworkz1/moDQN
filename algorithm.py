@@ -19,10 +19,6 @@ import copy
 import paddle
 import parl
 
-from weight import getWeightReward
-from weight import getWeightQfunc
-from weight import getWeightLoss
-
 
 class DQN(parl.Algorithm):
     def __init__(self, model, gamma=None, lr=None):

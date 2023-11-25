@@ -4,6 +4,7 @@ from show import showPareto
 from env import CPUnum
 from env import Mem
 from env import BandWidth
+from policy import policy_
 times = 1
 temp = 0
 
@@ -79,7 +80,7 @@ def mergePareto_final():
     optimal_solutions,_, _ = mergePareto(optimal_solutions)
     os.remove(file_path)
     with open("pareto_final.txt", "a") as f:
-        f.write("CPUnum="+str(CPUnum)+"Mem="+str(Mem)+"BandWith="+str(BandWidth)+"\n")
+        f.write("CPUnum="+str(CPUnum)+"Mem="+str(Mem)+"BandWith="+str(BandWidth)+"policy="+policy_+"\n")
         for a in optimal_solutions:
             f.write("round:" + str(a[1]) + "; act:" + str(a[2]) + "; feature:" + str(a[0]) + "\n")
 

@@ -1,5 +1,5 @@
 times = 100
-from weight import getWeightReward
+
 #from train import ep
 ep=0
 min1=0
