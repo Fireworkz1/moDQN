@@ -1,6 +1,6 @@
 import random
 
-
+glo=1
 def test1():
     List=[[2,3]]
 
@@ -81,7 +81,11 @@ def test5():
         print(1)
     elif a>0 and c>0:
         print(2)
-
+def test6():
+    global glo
+    glo += 1
+    print(glo)
 
 if __name__ == '__main__':
-    test5()
+
+    test6()

@@ -15,7 +15,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-
+import sys
 from agent import Agent
 from agent import flag
 from agent import flag_temp
@@ -183,7 +183,7 @@ def run_train_episode(agent, env, rpm):
     return feature1, feature2, feature3, reward1, reward2, reward3, action_list
 
 
-def main():
+def main(param=0):
     global sc_comm, sc_var
     global rewardavg
     global act_pareto_set, pareto_set, feature_set
@@ -220,11 +220,15 @@ def main():
 
     # start train
     global round
+    if param==0:
+        text=",默认运行"
+    else:
+        text=",多次运行,第"+str(param)+"次"
 
     while round < max_episode:  # 训练max_episode个回合，test部分不计算入episode数量
         #1.train part
         round += 1
-        print("ep,round:" + str(ep) + " " + str(round))
+        print("ep,round:" + str(ep) + " " + str(round)+text)
         #2.训练
         f1, f2, f3, r1, r2, r3, action_list = run_train_episode(agent, env, rpm)
 
@@ -258,6 +262,11 @@ def main():
     save_path = './mdqn_model.ckpt'
     agent.save(save_path)
 
+print(sys.argv)
+try:
+    time=int(sys.argv[1])
+except:
+    time=0
 
-if __name__ == '__main__':
-    main()
+main(time)
+

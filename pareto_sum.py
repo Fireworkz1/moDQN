@@ -1,7 +1,9 @@
 from pareto import mergePareto
 import os
 from show import showPareto
-
+from env import CPUnum
+from env import Mem
+from env import BandWidth
 times = 1
 temp = 0
 
@@ -72,12 +74,17 @@ def mergePareto_final():
     file_path = 'pareto_final.txt'
 
     optimal_solutions = read_optimal_solutions(file_path)
+
     # 合并得到pareto
     optimal_solutions,_, _ = mergePareto(optimal_solutions)
     os.remove(file_path)
     with open("pareto_final.txt", "a") as f:
+        f.write("CPUnum="+str(CPUnum)+"Mem="+str(Mem)+"BandWith="+str(BandWidth)+"\n")
         for a in optimal_solutions:
             f.write("round:" + str(a[1]) + "; act:" + str(a[2]) + "; feature:" + str(a[0]) + "\n")
+
+    with open("pareto_merge.txt", "a") as f:
+        f.write("pareto大小："+str(len(optimal_solutions)))
     return optimal_solutions
 
 
@@ -104,10 +111,11 @@ def calActionTimesFromPareto():
 
     print(action_list)
     print(index)
-    print("pareto_final解析完成")
+
     return
 if __name__ == "__main__":
     pareto_set = mergePareto_set()
     mergePareto_final()
     #calActionTimesFromPareto()
+    print("pareto_final解析完成")
     showPareto(pareto_set)

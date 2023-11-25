@@ -13,7 +13,7 @@ count = 0
 CPUnum = 4
 Mem = CPUnum * 1024
 BandWidth = 3
-e_greed = 0.2  # 模型学习率
+e_greed = 0.3  # 模型学习率
 e_greed_decrement = 1e-6
 
 import numpy as np
